@@ -3,38 +3,45 @@ from langchain_groq import ChatGroq
 from elevenlabs.client import ElevenLabs
 from deepgram import DeepgramClient, PrerecordedOptions
 import os
-import io
 
-# 1. جلب المفاتيح من الـ Secrets (الخزنة السريّة)
-set_api_key(st.secrets["ELEVENLABS_API_KEY"])
+# 1. إعداد المفاتيح من الـ Secrets
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
 DEEPGRAM_API_KEY = st.secrets["DEEPGRAM_API_KEY"]
 
-# 2. إعداد محرك الذكاء (ناتاشا)
+# 2. إعداد العملاء (الذكاء، الصوت، السمع)
 llm = ChatGroq(model_name="openai/gpt-oss-120b", temperature=0.7, groq_api_key=GROQ_API_KEY)
+client_eleven = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+dg_client = DeepgramClient(DEEPGRAM_API_KEY)
 
-st.set_page_config(page_title="Natasha Voice", page_icon="👩‍💻")
+st.set_page_config(page_title="Natasha Voice AI", page_icon="👩‍💻")
+
+# تصميم واجهة ناتاشا
+st.markdown("""
+    <style>
+    .stChatMessage { border-radius: 15px; }
+    .stAudio { margin-top: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.title("👩‍💻 ناتاشا: الوضع الصوتي الاحترافي")
 
-# تصميم ناتاشا للردود الصوتية (قصيرة وذكية)
-persona = "أنتِ ناتاشا، مساعدة ذكية جداً. أنتِ الآن في وضع الحوار الصوتي، لذا اجعلي إجاباتكِ قصيرة ومباشرة (جملة أو جملتين فقط) ليكون الحوار طبيعياً."
+# تعريف شخصية ناتاشا للوضع الصوتي
+persona = "أنتِ ناتاشا، مساعدة ذكية جداً ومرحة. بما أننا في حوار صوتي، اجعلي إجاباتكِ قصيرة جداً ومباشرة (جملة أو جملتين فقط). لا تستخدمي القوائم الطويلة."
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# عرض الشات القديم
+# عرض المحادثات السابقة
 for msg in st.session_state.messages:
-    with st.chat_message("user" if msg['role'] == 'user' else 'assistant'):
-        st.write(msg['content'])
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-# 3. واجهة السمع (زر المايك الذكي)
-# سنستخدم هنا تقنية تسجيل بسيطة ومستقرة للمتصفح
+# 3. واجهة التسجيل الذكية (تتحسس السكوت تلقائياً)
 audio_value = st.audio_input("🎙️ اضغط للتحدث مع ناتاشا")
 
 if audio_value:
-    # أ. تحويل الصوت لنص باستخدام Deepgram (الأذن الذكية)
-    dg_client = DeepgramClient(DEEPGRAM_API_KEY)
-    
+    # أ. تحويل الصوت لنص (Deepgram)
     with st.spinner("ناتاشا تسمعك..."):
         buffer_data = audio_value.read()
         payload = {"buffer": buffer_data}
@@ -44,22 +51,29 @@ if audio_value:
         user_text = response.results.channels[0].alternatives[0].transcript
 
     if user_text:
-        st.chat_message("user").write(user_text)
+        # عرض كلام المستخدم
+        with st.chat_message("user"):
+            st.markdown(user_text)
         st.session_state.messages.append({"role": "user", "content": user_text})
 
-        # ب. تفكير ناتاشا (الدماغ)
+        # ب. توليد رد ناتاشا (Groq)
         with st.spinner("ناتاشا تفكر..."):
             ai_response = llm.invoke([("system", persona)] + [("human", user_text)])
             ans_text = ai_response.content
 
-        # ج. تحويل الرد لصوت بشري (الحنجرة) من ElevenLabs
+        # ج. توليد الصوت البشري (ElevenLabs النسخة الجديدة)
         with st.spinner("ناتاشا تجيب..."):
-            audio_gen = generate(
+            audio_gen = client_eleven.generate(
                 text=ans_text,
-                voice="Bella", # صوت أنثوي رقيق، تقدر تغيره لاحقاً
+                voice="Bella",
                 model="eleven_multilingual_v2"
             )
             
-            st.chat_message("assistant").write(ans_text)
-            st.audio(audio_gen, format="audio/mp3", autoplay=True)
+            # تحويل البيانات الصوتية لصيغة يفهمها المتصفح
+            audio_bytes = b"".join(list(audio_gen))
+            
+            with st.chat_message("assistant"):
+                st.markdown(ans_text)
+                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+            
             st.session_state.messages.append({"role": "assistant", "content": ans_text})
