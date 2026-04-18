@@ -1,57 +1,65 @@
 import streamlit as st
 from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, AIMessage
-from gtts import gTTS
+from elevenlabs import generate, set_api_key
+from deepgram import DeepgramClient, PrerecordedOptions
+import os
 import io
 
-st.set_page_config(page_title="Natasha AI", page_icon="👩‍💻")
+# 1. جلب المفاتيح من الـ Secrets (الخزنة السريّة)
+set_api_key(st.secrets["ELEVENLABS_API_KEY"])
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+DEEPGRAM_API_KEY = st.secrets["DEEPGRAM_API_KEY"]
 
-# ثيم خفيف لناتاشا
-st.markdown("""
-    <style>
-    .stChatMessage { border-radius: 15px; }
-    </style>
-    """, unsafe_allow_html=True)
+# 2. إعداد محرك الذكاء (ناتاشا)
+llm = ChatGroq(model_name="openai/gpt-oss-120b", temperature=0.7, groq_api_key=GROQ_API_KEY)
 
-st.title("👩‍💻 ناتاشا العبقرية")
+st.set_page_config(page_title="Natasha Voice", page_icon="👩‍💻")
+st.title("👩‍💻 ناتاشا: الوضع الصوتي الاحترافي")
 
-# إعداد الموديل
-api_key = st.secrets["GROQ_API_KEY"]
-llm = ChatGroq(model_name="openai/gpt-oss-120b", temperature=0.8, groq_api_key=api_key)
+# تصميم ناتاشا للردود الصوتية (قصيرة وذكية)
+persona = "أنتِ ناتاشا، مساعدة ذكية جداً. أنتِ الآن في وضع الحوار الصوتي، لذا اجعلي إجاباتكِ قصيرة ومباشرة (جملة أو جملتين فقط) ليكون الحوار طبيعياً."
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# وظيفة تحويل النص إلى صوت
-def speak_text(text):
-    try:
-        tts = gTTS(text=text, lang='ar', slow=False)
-        fp = io.BytesIO()
-        tts.write_to_fp(fp)
-        return fp
-    except:
-        return None
+# عرض الشات القديم
+for msg in st.session_state.messages:
+    with st.chat_message("user" if msg['role'] == 'user' else 'assistant'):
+        st.write(msg['content'])
 
-# عرض الرسائل
-for message in st.session_state.messages:
-    with st.chat_message("user" if isinstance(message, HumanMessage) else "assistant"):
-        st.markdown(message.content)
+# 3. واجهة السمع (زر المايك الذكي)
+# سنستخدم هنا تقنية تسجيل بسيطة ومستقرة للمتصفح
+audio_value = st.audio_input("🎙️ اضغط للتحدث مع ناتاشا")
 
-# مدخل النص (استخدم علامة المايك الموجودة بالكيبورد مالت موبايلك)
-if prompt := st.chat_input("احجي وياي يا محمد..."):
-    st.session_state.messages.append(HumanMessage(content=prompt))
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        # إرسال المحادثة
-        full_response = llm.invoke(st.session_state.messages[-5:])
-        content = full_response.content
-        st.markdown(content)
+if audio_value:
+    # أ. تحويل الصوت لنص باستخدام Deepgram (الأذن الذكية)
+    dg_client = DeepgramClient(DEEPGRAM_API_KEY)
+    
+    with st.spinner("ناتاشا تسمعك..."):
+        buffer_data = audio_value.read()
+        payload = {"buffer": buffer_data}
+        options = PrerecordedOptions(model="nova-2", language="ar", smart_format=True)
         
-        # نطق الجواب تلقائياً
-        audio_data = speak_text(content)
-        if audio_data:
-            st.audio(audio_data, format='audio/mp3', autoplay=True)
+        response = dg_client.listen.prerecorded.v("1").transcribe_file(payload, options)
+        user_text = response.results.channels[0].alternatives[0].transcript
+
+    if user_text:
+        st.chat_message("user").write(user_text)
+        st.session_state.messages.append({"role": "user", "content": user_text})
+
+        # ب. تفكير ناتاشا (الدماغ)
+        with st.spinner("ناتاشا تفكر..."):
+            ai_response = llm.invoke([("system", persona)] + [("human", user_text)])
+            ans_text = ai_response.content
+
+        # ج. تحويل الرد لصوت بشري (الحنجرة) من ElevenLabs
+        with st.spinner("ناتاشا تجيب..."):
+            audio_gen = generate(
+                text=ans_text,
+                voice="Bella", # صوت أنثوي رقيق، تقدر تغيره لاحقاً
+                model="eleven_multilingual_v2"
+            )
             
-        st.session_state.messages.append(AIMessage(content=content))
+            st.chat_message("assistant").write(ans_text)
+            st.audio(audio_gen, format="audio/mp3", autoplay=True)
+            st.session_state.messages.append({"role": "assistant", "content": ans_text})
