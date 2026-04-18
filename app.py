@@ -66,22 +66,23 @@ if audio_value:
                 ai_response = llm.invoke([("system", persona)] + [("human", user_text)])
                 ans_text = ai_response.content
 
-            # ج. توليد الصوت البشري (ElevenLabs)
-            with st.spinner("ناتاشا تجيب..."):
-                audio_gen = client_eleven.generate(
-                    text=ans_text,
-                    voice="Bella",
-                    model="eleven_multilingual_v2"
-                )
+            # ج. توليد الصوت البشري (التحديث النهائي 2026)
+         with st.spinner("ناتاشا تجيب..."):
+             audio_gen = client_eleven.text_to_speech.convert(
+                 voice_id="21m00Tcm4TlvDq8ikWAM", # هذا هو كود صوت Bella الشهير
+                 text=ans_text,
+                 model_id="eleven_multilingual_v2",
+                 output_format="mp3_44100_128",
+             )
+            
+             # تجميع البيانات الصوتية
+              audio_bytes = b"".join(list(audio_gen))
+            
+              with st.chat_message("assistant"):
+                 st.markdown(ans_text)
+                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
                 
-                # تجميع قطع الصوت
-                audio_bytes = b"".join(list(audio_gen))
-                
-                with st.chat_message("assistant"):
-                    st.markdown(ans_text)
-                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                
-                st.session_state.messages.append({"role": "assistant", "content": ans_text})
+                 st.session_state.messages.append({"role": "assistant", "content": ans_text})
                 
     except Exception as e:
         st.error(f"حدث خطأ: {str(e)}")
