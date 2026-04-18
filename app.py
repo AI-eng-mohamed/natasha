@@ -1,7 +1,7 @@
 import streamlit as st
 from langchain_groq import ChatGroq
 from elevenlabs.client import ElevenLabs
-from deepgram import DeepgramClient, PrerecordedOptions
+from deepgram import DeepgramClient, PrerecordedOptions, FileSource
 import os
 
 # 1. إعداد المفاتيح من الـ Secrets
