@@ -35,11 +35,11 @@ if audio_value:
             buffer_data = audio_value.read()
             # صياغة الطلب بشكل يتوافق مع النسخة المستقرة
             payload = {"buffer": buffer_data}
-            options = PrerecordedOptions(
-                model="nova-2",
-                smart_format=True,
-                language="ar"
-            )
+          options = PrerecordedOptions(
+    model="nova-3",     # الموديل العام اللي يشتغل على كل اللغات
+    smart_format=True,
+    language="ar"
+)
             
             # محاولة استخدام الـ rest client مباشرة لتجنب أخطاء النسخ
             response = dg_client.listen.rest.v("1").transcribe_file(payload, options)
