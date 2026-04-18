@@ -2,78 +2,69 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from elevenlabs.client import ElevenLabs
 from deepgram import DeepgramClient, PrerecordedOptions, FileSource
-import os
+import io
 
-# 1. إعداد المفاتيح من الـ Secrets
+# 1. جلب المفاتيح
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
 DEEPGRAM_API_KEY = st.secrets["DEEPGRAM_API_KEY"]
 
-# 2. إعداد العملاء (الذكاء، الصوت، السمع)
+# 2. إعداد العملاء
 llm = ChatGroq(model_name="openai/gpt-oss-120b", temperature=0.7, groq_api_key=GROQ_API_KEY)
 client_eleven = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+# التأكد من تمرير المفتاح مباشرة للعميل
 dg_client = DeepgramClient(DEEPGRAM_API_KEY)
 
-st.set_page_config(page_title="Natasha Voice AI", page_icon="👩‍💻")
-
-# تصميم واجهة ناتاشا
-st.markdown("""
-    <style>
-    .stChatMessage { border-radius: 15px; }
-    .stAudio { margin-top: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.title("👩‍💻 ناتاشا: الوضع الصوتي الاحترافي")
-
-# تعريف شخصية ناتاشا للوضع الصوتي
-persona = "أنتِ ناتاشا، مساعدة ذكية جداً ومرحة. بما أننا في حوار صوتي، اجعلي إجاباتكِ قصيرة جداً ومباشرة (جملة أو جملتين فقط). لا تستخدمي القوائم الطويلة."
+st.set_page_config(page_title="Natasha AI", page_icon="👩‍💻")
+st.title("👩‍💻 ناتاشا: النسخة الاحترافية")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# عرض المحادثات السابقة
+# عرض الرسائل
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+        st.write(msg["content"])
 
-# 3. واجهة التسجيل الذكية (تتحسس السكوت تلقائياً)
-audio_value = st.audio_input("🎙️ اضغط للتحدث مع ناتاشا")
+# 3. المايك الجديد
+audio_value = st.audio_input("🎙️ احجي ويا ناتاشا")
 
 if audio_value:
-    # أ. تحويل الصوت لنص (Deepgram)
-    with st.spinner("ناتاشا تسمعك..."):
-        buffer_data = audio_value.read()
-        payload = {"buffer": buffer_data}
-        options = PrerecordedOptions(model="nova-2", language="ar", smart_format=True)
-        
-        response = dg_client.listen.prerecorded.v("1").transcribe_file(payload, options)
-        user_text = response.results.channels[0].alternatives[0].transcript
-
-    if user_text:
-        # عرض كلام المستخدم
-        with st.chat_message("user"):
-            st.markdown(user_text)
-        st.session_state.messages.append({"role": "user", "content": user_text})
-
-        # ب. توليد رد ناتاشا (Groq)
-        with st.spinner("ناتاشا تفكر..."):
-            ai_response = llm.invoke([("system", persona)] + [("human", user_text)])
-            ans_text = ai_response.content
-
-        # ج. توليد الصوت البشري (ElevenLabs النسخة الجديدة)
-        with st.spinner("ناتاشا تجيب..."):
-            audio_gen = client_eleven.generate(
-                text=ans_text,
-                voice="Bella",
-                model="eleven_multilingual_v2"
+    try:
+        with st.spinner("ناتاشا تسمعك..."):
+            buffer_data = audio_value.read()
+            # صياغة الطلب بشكل يتوافق مع النسخة المستقرة
+            payload = {"buffer": buffer_data}
+            options = PrerecordedOptions(
+                model="nova-2",
+                smart_format=True,
+                language="ar"
             )
             
-            # تحويل البيانات الصوتية لصيغة يفهمها المتصفح
-            audio_bytes = b"".join(list(audio_gen))
-            
-            with st.chat_message("assistant"):
-                st.markdown(ans_text)
+            # محاولة استخدام الـ rest client مباشرة لتجنب أخطاء النسخ
+            response = dg_client.listen.rest.v("1").transcribe_file(payload, options)
+            user_text = response.results.channels[0].alternatives[0].transcript
+
+        if user_text and user_text.strip():
+            st.chat_message("user").write(user_text)
+            st.session_state.messages.append({"role": "user", "content": user_text})
+
+            with st.spinner("ناتاشا تفكر..."):
+                persona = "أنتِ ناتاشا، مساعدة ذكية. إجاباتكِ قصيرة جداً (جملة واحدة)."
+                ai_response = llm.invoke([("system", persona), ("human", user_text)])
+                ans_text = ai_response.content
+
+            with st.spinner("ناتاشا تجيب..."):
+                audio_gen = client_eleven.generate(
+                    text=ans_text,
+                    voice="Bella",
+                    model="eleven_multilingual_v2"
+                )
+                audio_bytes = b"".join(list(audio_gen))
+                
+                st.chat_message("assistant").write(ans_text)
                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-            
-            st.session_state.messages.append({"role": "assistant", "content": ans_text})
+                st.session_state.messages.append({"role": "assistant", "content": ans_text})
+    
+    except Exception as e:
+        st.error(f"اكو مشكلة صغيرة بالاتصال: {str(e)}")
