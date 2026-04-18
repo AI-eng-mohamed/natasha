@@ -1,6 +1,6 @@
 import streamlit as st
 from langchain_groq import ChatGroq
-from elevenlabs import generate, set_api_key
+from elevenlabs.client import ElevenLabs
 from deepgram import DeepgramClient, PrerecordedOptions
 import os
 import io
