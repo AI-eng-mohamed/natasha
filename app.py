@@ -46,7 +46,7 @@ if audio_value:
             buffer_data = audio_value.read()
             payload: FileSource = {"buffer": buffer_data}
             options = PrerecordedOptions(
-                model="general",
+                model="nova-3",
                 language="ar",
                 smart_format=True,
             )
