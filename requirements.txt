@@ -1,3 +1,8 @@
 streamlit
 langchain-groq
 langchain-community
+streamlit
+langchain-groq
+langchain-community
+streamlit-mic-recorder
+gTTS
