@@ -13,7 +13,7 @@ llm = ChatGroq(
 
 st.set_page_config(page_title="Natasha Chat", page_icon="👩‍💻")
 
-st.titl("هلو اني ناتاشا")
+st.title("هلو اني ناتاشا")
 st.info("مرحباً محمد.")
 
 # تعريف الشخصية
